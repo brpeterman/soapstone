@@ -1,5 +1,3 @@
-import * as D from "io-ts/Decoder";
-
 export interface UserMessage {
   readonly messageId: string;
   readonly content: MessageContent;
@@ -63,6 +61,50 @@ export function convertDocumentsToMessages(documents: any[]): UserMessage[] {
 }
 
 export function validateMessageContent(content: any): MessageContent {
-  return <MessageContent> content;
+  try {
+    const validating = {
+      phrase1: content.phrase1,
+      phrase2: content.phrase2,
+      conjunction: content.conjunction
+    };
+    if (!validating.phrase1 ||
+      (validating.phrase1 && validating.phrase2 && !validating.conjunction) ||
+      (!validating.phrase2 && validating.conjunction)) {
+      throw invalidContentError()
+    }
+
+    validatePhrase(validating.phrase1);
+    validatePhrase(validating.phrase2);
+    validateConjunction(validating.conjunction);
+
+    return <MessageContent> validating;
+  } catch {
+    throw invalidContentError();
+  }
 }
 
+function validatePhrase(phrase: any) {
+  if (!phrase) {
+    return;
+  }
+  if (!phrase.template || !phrase.word) {
+    throw invalidContentError()
+  }
+  if (!Object.values(Template).includes(phrase.template) ||
+    !Object.values(Word).includes(phrase.word)) {
+      throw invalidContentError()
+  }
+}
+
+function validateConjunction(conjunction: any) {
+  if (!conjunction) {
+    return;
+  }
+  if (!Object.values(Conjunction).includes(conjunction)) {
+    throw invalidContentError()
+  }
+}
+
+function invalidContentError(): Error {
+  return new Error("Invalid message content");
+}

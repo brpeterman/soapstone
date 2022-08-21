@@ -1,4 +1,4 @@
-import { Location } from "../util/location";
+import { Location, validateLocation } from "../util/location";
 import { MessageContent, validateMessageContent } from "../util/messages";
 import { getClient } from "../util/search-client";
 
@@ -7,7 +7,7 @@ const DOMAIN_ENDPOINT = process.env.DOMAIN_ENDPOINT!;
 interface Request {
   readonly userId: string;
   readonly message: any;
-  readonly location: Location;
+  readonly location: any;
 }
 
 function currentTimestamp(): string {
@@ -26,10 +26,7 @@ export const handlePostMessage = async (event: Request): Promise<void> => {
   console.debug(JSON.stringify(event));
   const userId = event.userId;
   const content = validateMessageContent(event.message);
-  if (!content) {
-    throw new Error("Invalid message content");
-  }
-  const location = event.location;
+  const location = validateLocation(event.location);
   const client = await getClient(DOMAIN_ENDPOINT);
 
   console.debug(`Posting message for user ${userId} at location ${JSON.stringify(location)}`);

@@ -55,6 +55,9 @@ export class UserApiStack extends Stack {
       methodResponses: [
         {
           statusCode: '204'
+        },
+        {
+          statusCode: '400'
         }
       ]
     });
@@ -186,6 +189,13 @@ export class UserApiStack extends Stack {
       integrationResponses: [
         {
           statusCode: '204'
+        },
+        {
+          statusCode: '400',
+          selectionPattern: 'Invalid',
+          responseTemplates: {
+            'application/json': ''
+          }
         }
       ]
     });

@@ -6,6 +6,9 @@ export const APPLICATION_CONFIG: ApplicationConfig = {
     region: 'us-west-2',
     authEnabled: false,
     vpcEnabled: false,
-    searchAvailabilityZones: 2
+    searchAvailabilityZones: 2,
+    searchDataNodes: 2,
+    searchMasterNodes: 0,
+    searchInstanceType: 't3.small.search'
   }
 }

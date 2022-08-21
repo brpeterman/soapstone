@@ -6,7 +6,7 @@ const DOMAIN_ENDPOINT = process.env.DOMAIN_ENDPOINT!;
 
 interface Request {
   readonly userId: string;
-  readonly content: any;
+  readonly message: any;
   readonly location: Location;
 }
 
@@ -25,7 +25,10 @@ function userMessagesQuery(userId: string) {
 export const handlePostMessage = async (event: Request): Promise<void> => {
   console.debug(JSON.stringify(event));
   const userId = event.userId;
-  const content = validateMessageContent(event.content);
+  const content = validateMessageContent(event.message);
+  if (!content) {
+    throw new Error("Invalid message content");
+  }
   const location = event.location;
   const client = await getClient(DOMAIN_ENDPOINT);
 
@@ -35,22 +38,40 @@ export const handlePostMessage = async (event: Request): Promise<void> => {
     body: {
       userId,
       content: JSON.stringify(content),
-      _timestamp: currentTimestamp()
+      location: {
+        lat: location.latitude,
+        lon: location.longitude
+      },
+      '@timestamp': currentTimestamp()
     },
     index: 'messages'
   });
 
   // Find older messages and delete them
-  await client.deleteByQuery({
+  const oldDocs = await client.search({
     index: 'messages',
     body: {
       query: userMessagesQuery(userId),
       from: 30,
       sort: {
-        _timestamp: {
+        '@timestamp': {
           order: 'desc'
         }
       }
     }
   });
+  if (oldDocs.body.hits?.hits) {
+    await client.deleteByQuery({
+      index: 'messages',
+      body: {
+        query: {
+          bool: {
+            should: oldDocs.body.hits?.hits?.map((doc: any) => {
+              return { term: doc._id }
+            })
+          }
+        }
+      }
+    });
+  }
 }

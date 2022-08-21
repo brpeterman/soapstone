@@ -4,14 +4,7 @@ export interface Credentials {
 }
 
 export interface StageCredentials {
-  readonly aws: AwsCredentials;
   readonly google: GoogleCredentials;
-}
-
-export interface AwsCredentials {
-  readonly accountId: string;
-  readonly secretKeyId: string;
-  readonly secretAccessKey: string;
 }
 
 export interface GoogleCredentials {
@@ -30,4 +23,7 @@ export interface StageConfig {
   readonly authEnabled: boolean;
   readonly vpcEnabled: boolean;
   readonly searchAvailabilityZones: number;
+  readonly searchDataNodes: number;
+  readonly searchMasterNodes: number;
+  readonly searchInstanceType: string;
 }

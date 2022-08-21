@@ -1,6 +1,6 @@
 import { Stack, StackProps } from 'aws-cdk-lib';
-import { CfnIdentityPool, UserPool, UserPoolClient, UserPoolClientIdentityProvider, UserPoolIdentityProviderGoogle } from 'aws-cdk-lib/aws-cognito';
-import { ManagedPolicy, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import { CfnIdentityPool, CfnIdentityPoolRoleAttachment, CfnUserPoolGroup, UserPool, UserPoolClient, UserPoolClientIdentityProvider, UserPoolIdentityProvider, UserPoolIdentityProviderGoogle } from 'aws-cdk-lib/aws-cognito';
+import { Effect, FederatedPrincipal, PolicyDocument, PolicyStatement, Role } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { GoogleCredentials } from '.';
 
@@ -15,12 +15,11 @@ export class IdentityStack extends Stack {
   userPool: UserPool;
   adminUserPool: UserPool;
   adminIdentityPool: CfnIdentityPool;
-  adminRole: Role;
 
   constructor(scope: Construct, id: string, props: IdentityStackProps) {
     super(scope, id, props);
 
-    this.userPool = new UserPool(this, 'OidcUsers', {
+    this.userPool = new UserPool(this, 'GoogleUsers', {
       selfSignUpEnabled: true
     });
     this.userPool.addDomain('default', {
@@ -29,14 +28,14 @@ export class IdentityStack extends Stack {
       }
     })
 
-    new UserPoolIdentityProviderGoogle(this, 'GoogleOidcProvider', {
+    const googleIdProvider = new UserPoolIdentityProviderGoogle(this, 'GoogleIdProvider', {
       userPool: this.userPool,
       clientId: props.googleCredentials.clientId,
       clientSecret: props.googleCredentials.clientSecret,
       scopes: ['openid']
     });
 
-    new UserPoolClient(this, 'GoogleOidcClient', {
+    const googleIdClient = new UserPoolClient(this, 'GoogleIdClient', {
       userPool: this.userPool,
       generateSecret: true,
       supportedIdentityProviders: [UserPoolClientIdentityProvider.GOOGLE],
@@ -44,6 +43,7 @@ export class IdentityStack extends Stack {
         callbackUrls: [APP_CALLBACK_URL]
       }
     });
+    googleIdClient.node.addDependency(googleIdProvider);
 
     // Opensearch Dashboard access
     this.adminUserPool = new UserPool(this, 'AdminUsers', {
@@ -55,20 +55,10 @@ export class IdentityStack extends Stack {
       }
     });
 
-    new UserPoolIdentityProviderGoogle(this, 'AdminGoogleOidcProvider', {
-      userPool: this.adminUserPool,
-      clientId: props.googleCredentials.clientId,
-      clientSecret: props.googleCredentials.clientSecret,
-      scopes: ['openid']
-    });
-
-    const adminUserPoolClient = new UserPoolClient(this, 'AdminGoogleOidcClient', {
+    const adminUserPoolClient = new UserPoolClient(this, 'AdminCognitoPoolClient', {
       userPool: this.adminUserPool,
       generateSecret: true,
-      supportedIdentityProviders: [UserPoolClientIdentityProvider.GOOGLE],
-      oAuth: {
-        callbackUrls: [APP_CALLBACK_URL]
-      }
+      supportedIdentityProviders: [UserPoolClientIdentityProvider.COGNITO]
     });
 
     this.adminIdentityPool = new CfnIdentityPool(this, 'AdminIdentityPool', {
@@ -81,11 +71,44 @@ export class IdentityStack extends Stack {
       ]
     });
 
-    this.adminRole = new Role(this, 'AdminRole', {
-      assumedBy: new ServicePrincipal("opensearchservice.amazonaws.com"),
-      managedPolicies: [
-        ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonOpenSearchServiceCognitoAccess')
-      ]
+    const adminRole = new Role(this, 'AdminRole', {
+      assumedBy: new FederatedPrincipal('cognito-identity.amazonaws.com', {
+        StringEquals: {
+          'cognito-identity.amazonaws.com:aud': this.adminIdentityPool.ref
+        },
+        'ForAnyValue:StringLike': {
+          'cognito-identity.amazonaws.com:amr': 'authenticated'
+        }
+      }, 'sts:AssumeRoleWithWebIdentity'),
+      inlinePolicies: {
+        AdminPolicy: new PolicyDocument({
+          statements: [
+            new PolicyStatement({
+              effect: Effect.ALLOW,
+              actions: [
+                'mobileanalytics:PutEvents',
+                'cognito-sync:*',
+                'cognito-identity:*'
+              ],
+              resources: ['*']
+            }),
+            new PolicyStatement({
+              effect: Effect.ALLOW,
+              actions: [
+                'es:ESHttp*'
+              ],
+              resources: ['*']
+            })
+          ]
+        })
+      }
+    });
+
+    new CfnIdentityPoolRoleAttachment(this, 'AdminRoleAttachment', {
+      identityPoolId: this.adminIdentityPool.ref,
+      roles: {
+        authenticated: adminRole.roleArn
+      }
     });
   }
 

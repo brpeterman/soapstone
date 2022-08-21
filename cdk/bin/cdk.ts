@@ -44,8 +44,13 @@ const searchStack = new SearchStack(app, 'SearchStack', {
   availabilityZones: config.searchAvailabilityZones,
   adminPool: identityStack.adminUserPool,
   adminIdentityPool: identityStack.adminIdentityPool,
-  adminRole: identityStack.adminRole,
-  vpc: vpcStack ? vpcStack.vpc : undefined
+  vpc: vpcStack ? vpcStack.vpc : undefined,
+  capacity: {
+    dataNodeInstanceType: config.searchInstanceType,
+    masterNodeInstanceType: config.searchInstanceType,
+    dataNodes: config.searchDataNodes,
+    masterNodes: config.searchMasterNodes
+  }
 });
 
 const userApiStack = new UserApiStack(app, 'UserApiStack', {

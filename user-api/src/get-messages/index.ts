@@ -24,7 +24,12 @@ export const handleGetMessages = async (event: Request): Promise<UserMessage[]> 
   const result = await client.search({
     index: 'messages',
     body: {
-      query: userMessagesQuery(userId)
+      query: userMessagesQuery(userId),
+      sort: {
+        '@timestamp': {
+          order: 'desc'
+        }
+      }
     }
   });
 
@@ -33,5 +38,5 @@ export const handleGetMessages = async (event: Request): Promise<UserMessage[]> 
     return Promise.resolve([]);
   }
 
-  return Promise.resolve(convertDocumentsToMessages(result.body.hits));
+  return Promise.resolve(convertDocumentsToMessages(result.body.hits?.hits || []));
 }

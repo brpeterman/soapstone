@@ -1,6 +1,6 @@
 import { Client } from '@opensearch-project/opensearch';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
-import createAwsOpensearchConnector from 'aws-opensearch-connector';
+const createAwsOpensearchConnector = require('aws-opensearch-connector')
 
 export const getClient = async (host: string) => {
   const awsCredentials = await defaultProvider()();
@@ -13,6 +13,6 @@ export const getClient = async (host: string) => {
   });
   return new Client({
       ...connector,
-      node: host,
+      node: `https://${host}`,
   });
 }

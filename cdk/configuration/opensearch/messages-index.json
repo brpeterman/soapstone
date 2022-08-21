@@ -1,0 +1,15 @@
+{
+    "mappings": {
+        "properties": {
+            "userId": {
+                "type": "keyword"
+            },
+            "location": {
+                "type": "geo_point"
+            },
+            "content": {
+                "type": "text"
+            }
+        }
+    }
+}

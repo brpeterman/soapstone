@@ -1,5 +1,5 @@
 import { Duration, Stack, StackProps } from 'aws-cdk-lib';
-import { AuthorizationType, CognitoUserPoolsAuthorizer, Integration, LambdaIntegration, MethodOptions, RestApi } from 'aws-cdk-lib/aws-apigateway';
+import { AuthorizationType, CognitoUserPoolsAuthorizer, ContentHandling, Integration, LambdaIntegration, MethodOptions, PassthroughBehavior, RestApi } from 'aws-cdk-lib/aws-apigateway';
 import { Code, Function, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
 import * as path from 'path';
@@ -43,20 +43,43 @@ export class UserApiStack extends Stack {
 
     const messagesResource = api.root.addResource('messages');
     messagesResource.addMethod('GET', this.buildGetMessagesIntegration(props.domain, props.authEnabled, props.vpc), {
-      ...defaultMethodOptions
+      ...defaultMethodOptions,
+      methodResponses: [
+        {
+          statusCode: '200'
+        }
+      ]
     });
     messagesResource.addMethod('POST', this.buildPostMessageIntegration(props.domain, props.authEnabled, props.vpc), {
-      ...defaultMethodOptions
+      ...defaultMethodOptions,
+      methodResponses: [
+        {
+          statusCode: '204'
+        }
+      ]
     });
     messagesResource.addMethod('DELETE', this.buildDeleteMessageIntegration(props.domain, props.authEnabled, props.vpc), {
       ...defaultMethodOptions,
       requestParameters: {
-        messageId: true
-      }
+        'method.request.querystring.messageId': true
+      },
+      methodResponses: [
+        {
+          statusCode: '204'
+        }
+      ]
     });
     const locationResource = messagesResource.addResource("{location}");
     locationResource.addMethod('GET', this.buildGetLocationMessagesIntegration(props.domain, props.authEnabled, props.vpc), {
-      ...defaultMethodOptions
+      ...defaultMethodOptions,
+      requestParameters: {
+        'method.request.path.location': true
+      },
+      methodResponses: [
+        {
+          statusCode: '200'
+        }
+      ]
     });
   }
 
@@ -71,6 +94,7 @@ export class UserApiStack extends Stack {
           statements: [
             new PolicyStatement({
               actions: [
+                'es:ESHttpPost',
                 'es:ESHttpGet'
               ],
               effect: Effect.ALLOW,
@@ -97,11 +121,17 @@ export class UserApiStack extends Stack {
 
     return new LambdaIntegration(handler, {
       proxy: false,
+      passthroughBehavior: PassthroughBehavior.WHEN_NO_TEMPLATES,
       requestTemplates: {
-        integrationMapping: `{
+        'application/json': `{
             "userId": "${authEnabled ? '$context.authorizer.claims.sub' : DUMMY_USER_ID}"
           }`
-      }
+      },
+      integrationResponses: [
+        {
+          statusCode: '200'
+        }
+      ]
     });
   }
 
@@ -116,6 +146,7 @@ export class UserApiStack extends Stack {
           statements: [
             new PolicyStatement({
               actions: [
+                'es:ESHttpPost',
                 'es:ESHttpPut',
                 'es:ESHttpDelete',
                 'es:ESHttpGet'
@@ -144,13 +175,19 @@ export class UserApiStack extends Stack {
 
     return new LambdaIntegration(handler, {
       proxy: false,
+      passthroughBehavior: PassthroughBehavior.WHEN_NO_TEMPLATES,
       requestTemplates: {
-        integrationMapping: `{
-          "userId": "${authEnabled ? '$context.authorizer.claims.sub' : DUMMY_USER_ID}",
-          "message: "$util.escapeJavaScript($input.json('$.message))",
-          "location": "$util.escapeJavaScript($input.json('$.location'))"
-        }`
-      }
+        'application/json': `{
+  "userId": "${authEnabled ? '$context.authorizer.claims.sub' : DUMMY_USER_ID}",
+  "message": $input.json('$.message'),
+  "location": $input.json('$.location')
+}`
+      },
+      integrationResponses: [
+        {
+          statusCode: '204'
+        }
+      ]
     });
   }
 
@@ -165,6 +202,7 @@ export class UserApiStack extends Stack {
           statements: [
             new PolicyStatement({
               actions: [
+                'es:ESHttpPost',
                 'es:ESHttpDelete',
                 'es:ESHttpGet'
               ],
@@ -192,12 +230,21 @@ export class UserApiStack extends Stack {
 
     return new LambdaIntegration(handler, {
       proxy: false,
+      requestParameters: {
+        'integration.request.querystring.messageId': 'method.request.querystring.messageId'
+      },
+      passthroughBehavior: PassthroughBehavior.WHEN_NO_TEMPLATES,
       requestTemplates: {
-        integrationMapping: `{
-          "userId": "${authEnabled ? '$context.authorizer.claims.sub' : DUMMY_USER_ID}",
-          "messageId": "$util.escapeJavaScript($method.request.querystring.messageId)"
-        }`
-      }
+        'application/json': `{
+  "userId": "${authEnabled ? '$context.authorizer.claims.sub' : DUMMY_USER_ID}",
+  "messageId": "$input.params('messageId')"
+}`
+      },
+      integrationResponses: [
+        {
+          statusCode: '204'
+        }
+      ]
     });
   }
 
@@ -212,6 +259,7 @@ export class UserApiStack extends Stack {
           statements: [
             new PolicyStatement({
               actions: [
+                'es:ESHttpPost',
                 'es:ESHttpGet'
               ],
               effect: Effect.ALLOW,
@@ -238,11 +286,20 @@ export class UserApiStack extends Stack {
 
     return new LambdaIntegration(handler, {
       proxy: false,
+      requestParameters: {
+        'integration.request.path.location': 'method.request.path.location'
+      },
+      passthroughBehavior: PassthroughBehavior.WHEN_NO_TEMPLATES,
       requestTemplates: {
-        integrationMapping: `{
-            "location": "$util.escapeJavaScript($method.request.path.location))"
-          }`
-      }
+        'application/json': `{
+  "location": "$input.params('location')"
+}`
+      },
+      integrationResponses: [
+        {
+          statusCode: '200'
+        }
+      ]
     });
   }
 }

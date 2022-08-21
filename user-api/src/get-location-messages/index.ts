@@ -40,7 +40,7 @@ export const handleGetLocationMessages = async (event: Request): Promise<UserMes
       size: 20,
       sort: [
         {
-          _timestamp: {
+          '@timestamp': {
             order: 'desc'
           }
         }
@@ -53,5 +53,5 @@ export const handleGetLocationMessages = async (event: Request): Promise<UserMes
     return Promise.resolve([]);
   }
 
-  return Promise.resolve(convertDocumentsToMessages(result.body.hits));
+  return Promise.resolve(convertDocumentsToMessages(result.body.hits?.hits || []));
 }

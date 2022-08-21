@@ -1,17 +1,16 @@
 import { Stack, StackProps } from 'aws-cdk-lib';
 import { CfnIdentityPool, UserPool } from 'aws-cdk-lib/aws-cognito';
 import { Vpc } from 'aws-cdk-lib/aws-ec2';
-import { AccountPrincipal, Effect, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import { AccountPrincipal, Effect, ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { CapacityConfig, Domain, EngineVersion } from 'aws-cdk-lib/aws-opensearchservice';
 import { Construct } from 'constructs';
 
 interface SearchStackProps extends StackProps {
-  readonly capacity?: CapacityConfig;
+  readonly capacity: CapacityConfig;
   readonly availabilityZones: number;
   readonly vpc?: Vpc;
   readonly adminPool: UserPool;
   readonly adminIdentityPool: CfnIdentityPool;
-  readonly adminRole: Role;
 }
 
 export class SearchStack extends Stack {
@@ -19,6 +18,13 @@ export class SearchStack extends Stack {
 
   constructor(scope: Construct, id: string, props: SearchStackProps) {
     super(scope, id, props);
+
+    const cognitoRole = new Role(this, 'CognitoAccessForAmazonOpenSearch', {
+      assumedBy: new ServicePrincipal("opensearchservice.amazonaws.com"),
+      managedPolicies: [
+        ManagedPolicy.fromAwsManagedPolicyName('AmazonOpenSearchServiceCognitoAccess')
+      ]
+    });
 
     this.domain = new Domain(this, 'MessagesDomain', {
       version: EngineVersion.OPENSEARCH_1_3,
@@ -46,7 +52,7 @@ export class SearchStack extends Stack {
       cognitoDashboardsAuth: {
         userPoolId: props.adminPool.userPoolId,
         identityPoolId: props.adminIdentityPool.ref,
-        role: props.adminRole
+        role: cognitoRole
       }
     });
   }
